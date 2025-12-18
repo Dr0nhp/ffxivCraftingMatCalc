@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FFXIV Crafting Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 12px 32px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .error {
+            background: #fee;
+            border: 2px solid #fcc;
+            padding: 16px;
+            border-radius: 8px;
+            color: #c33;
+            margin-bottom: 20px;
+        }
+
+        .results {
+            margin-top: 30px;
+        }
+
+        .result-header {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .material-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .material-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+
+        .material-item:hover {
+            background: #e9ecef;
+        }
+
+        .material-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .material-meta {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .material-amount {
+            font-weight: 700;
+            color: #667eea;
+            font-size: 16px;
+        }
+
+        .material-source {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .source-gathering {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .source-fishing {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .source-vendor {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .source-crafted {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .source-unknown {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 FFXIV Crafting Calculator</h1>
+        <p class="subtitle">Enter an item name to calculate required materials (using @xivapi/js)</p>
+
+        <div class="search-box">
+            <input
+                type="text"
+                id="itemInput"
+                placeholder="e.g. Rarefied Sykon Bavarois"
+                autocomplete="off"
+            >
+            <button id="calculateBtn">Calculate</button>
+        </div>
+
+        <div id="output"></div>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+</body>
+</html>
