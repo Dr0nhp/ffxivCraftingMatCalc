@@ -28,7 +28,6 @@ async function findItemByName(name) {
             name: best.fields.Name
         };
     } catch (err) {
-        console.error('Search error:', err);
         throw new Error(`Failed to find item: ${name}`);
     }
 }
@@ -44,7 +43,6 @@ async function getItem(id) {
             name: item.fields.Name
         };
     } catch (err) {
-        console.error(`Failed to get item ${id}:`, err);
         throw new Error(`Item ${id} not found`);
     }
 }
@@ -100,67 +98,11 @@ async function getRecipe(itemId) {
         recipeCache.set(itemId, recipeData);
         return recipeData;
     } catch (err) {
-        console.error("Recipe error:", err);
         recipeCache.set(itemId, null);
         return null;
     }
 }
 
-// Check Special Shop with detailed costs (Tomestones, Tokens, etc.)
-async function checkSpecialShop(itemId) {
-    try {
-        const { results } = await xiv.search({
-            query: `ItemReceive=${itemId}`,
-            sheets: 'SpecialShop'
-        });
-
-        if (results.length === 0) return null;
-
-        console.log(`SPECIAL_SHOP found for item ${itemId}:`, JSON.stringify(results[0], null, 2));
-
-        const shopData = results[0];
-        const source = {
-            type: 'special_shop',
-            costs: []
-        };
-
-        // SpecialShop has arrays: ItemReceive, ItemCost, CostAmount
-        const receiveArray = shopData.fields?.ItemReceive || [];
-        const costArray = shopData.fields?.ItemCost || [];
-        const costAmountArray = shopData.fields?.CostAmount || [];
-
-        // Find which entry in ItemReceive matches our itemId
-        for (let i = 0; i < receiveArray.length; i++) {
-            if (receiveArray[i]?.value === itemId) {
-                // Found the entry - now get the costs
-                for (let j = 0; j < costArray.length; j++) {
-                    const costItem = costArray[j];
-                    const amount = costAmountArray[j];
-                    if (costItem && costItem.value && amount) {
-                        try {
-                            const costItemData = await getItem(costItem.value);
-                            source.costs.push({
-                                item: costItemData.name,
-                                amount: amount
-                            });
-                        } catch (err) {
-                            source.costs.push({
-                                itemId: costItem.value,
-                                amount: amount
-                            });
-                        }
-                    }
-                }
-                break;
-            }
-        }
-
-        sourceCache.set(itemId, source);
-        return source;
-    } catch (err) {
-        return null;
-    }
-}
 
 // Detect Source
 async function detectSource(itemId) {
@@ -206,48 +148,25 @@ async function detectSource(itemId) {
             return source;
         }
 
-        // Check Special Shop (Tomestones, Tokens, etc.)
-        const specialShopCheck = await checkSpecialShop(itemId);
-        if (specialShopCheck) return specialShopCheck;
-
-        // Check other sources
-        const additionalSources = [
-            { sheet: 'SpearfishingItem', type: 'spearfishing' },
-            { sheet: 'GCShop', type: 'gc_shop' },
-            { sheet: 'FccShop', type: 'fcc_shop' },
-            { sheet: 'GCScripShopItem', type: 'gc_scrip_shop' },
-            { sheet: 'RetainerTask', type: 'retainer' },
-            { sheet: 'SatisfactionSupply', type: 'satisfaction_supply' },
-            { sheet: 'HWDCrafterSupply', type: 'hwd_crafter_supply' },
-            { sheet: 'SubmarineDrop', type: 'submarine_drop' },
-            { sheet: 'CompanyCraftSupply', type: 'company_craft_supply' },
-            { sheet: 'InclusionShop', type: 'inclusion_shop' }
-        ];
-
-        for (const { sheet, type } of additionalSources) {
+        // Check Spearfishing
+        try {
             const { results } = await xiv.search({
                 query: `Item=${itemId}`,
-                sheets: sheet
+                sheets: 'SpearfishingItem'
             });
 
             if (results.length > 0) {
-                const source = { type };
+                const source = { type: 'spearfishing' };
                 sourceCache.set(itemId, source);
                 return source;
             }
+        } catch (err) {
+            // SpearfishingItem nicht durchsuchbar
         }
 
-        // Log unknown source for debugging - dump complete object
-        const itemInfo = await xiv.data.sheets().get("Item", itemId);
-        console.log(`Unknown source for item ${itemId} - COMPLETE OBJECT:`, JSON.stringify(itemInfo, null, 2));
-
-        const source = {
-            type: "unknown",
-            itemId: itemId,
-            hint: itemInfo.fields?.ItemSearchCategory?.fields?.Name ||
-                  itemInfo.fields?.ItemUICategory?.fields?.Name ||
-                  "no hint available"
-        };
+        // Unknown source - kann nicht automatisch erkannt werden
+        // (SpecialShop/Script Vendors sind nicht über Query durchsuchbar)
+        const source = { type: "unknown" };
         sourceCache.set(itemId, source);
         return source;
     } catch (err) {
@@ -323,11 +242,8 @@ async function calculateMaterials(itemName) {
     const item = await findItemByName(itemName);
     if (!item) throw new Error(`Item not found: ${itemName}`);
 
-    console.log("Found item:", item);
     const tree = await buildMaterialTree(item.id, 1);
-    console.log("Material tree:", tree);
     const flattened = flattenTree(tree);
-    console.log("Flattened materials:", flattened);
     return flattened;
 }
 
@@ -365,7 +281,7 @@ function showResults(materials) {
 
                     return `
                     <div class="material-item">
-                        <a class="material-name" href="https://ffxiv.consolegameswiki.com/wiki/${m.item.name}">${m.item.name}</a>
+                        <a class="material-name" target="_blank" rel="noopener noreferrer" href="https://ffxiv.consolegameswiki.com/wiki/${m.item.name}">${m.item.name}</a>
                         <div class="material-meta">
                             <span class="material-amount">${Math.ceil(m.totalAmount)}×</span>
                             <span class="material-source source-${m.source.type}">${sourceDisplay}</span>
@@ -398,11 +314,76 @@ async function handleCalculate() {
         showResults(materials);
     } catch (err) {
         showError(err.message);
-        console.error(err);
     } finally {
         button.disabled = false;
     }
 }
+
+// DEBUG: Test verschiedene Shop-Sheets
+async function testShopSheets() {
+    console.log('=== Testing Shop Sheets ===');
+
+    const testItemId = 49225;
+
+    // Teste verschiedene Shop-Sheet-Namen
+    const shopSheets = [
+        'SpecialShop',
+        'ShopItem',
+        'GilShop',
+        'TopicSelect',
+        'PreHandler',
+        'CustomTalk',
+        'GCShop',
+        'FccShop',
+        'GilShopItem'
+    ];
+
+    for (const sheetName of shopSheets) {
+        console.log(`\nTesting: ${sheetName}`);
+
+        // Test direct access
+        try {
+            const data = await xiv.data.sheets().get(sheetName, 1);
+            console.log(`  ✓ Direct access works`);
+            console.log(`  Fields:`, Object.keys(data.fields || {}));
+        } catch (err) {
+            console.log(`  ✗ Direct access: ${err.message}`);
+        }
+
+        // Test search
+        try {
+            const result = await xiv.search({ query: `Item=${testItemId}`, sheets: sheetName });
+            console.log(`  ✓ Search works: ${result.results.length} results`);
+            if (result.results.length > 0) {
+                console.log(`  First result fields:`, Object.keys(result.results[0].fields || {}));
+            }
+        } catch (err) {
+            console.log(`  ✗ Search: ${err.message}`);
+        }
+    }
+
+    // Test: Hole Item direkt und suche nach Shop-Referenzen
+    console.log('\n\nItem fields that might reference shops:');
+    try {
+        const item = await xiv.data.sheets().get('Item', testItemId);
+        const shopRelatedFields = {};
+        for (const key in item.fields) {
+            if (key.toLowerCase().includes('shop') ||
+                key.toLowerCase().includes('price') ||
+                key.toLowerCase().includes('cost') ||
+                key.toLowerCase().includes('vendor') ||
+                key.toLowerCase().includes('currency')) {
+                shopRelatedFields[key] = item.fields[key];
+            }
+        }
+        console.log('Shop-related fields:', shopRelatedFields);
+    } catch (err) {
+        console.log('Error:', err);
+    }
+}
+
+// Führe Test beim Laden aus
+testShopSheets();
 
 // Initialize
 document.getElementById('calculateBtn').addEventListener('click', handleCalculate);
